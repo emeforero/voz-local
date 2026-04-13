@@ -1,0 +1,24 @@
+# Rust / Cargo
+target/
+**/*.rs.bk
+
+# Node
+node_modules/
+.svelte-kit/
+build/
+
+# Tauri generated
+src-tauri/gen/
+
+# macOS
+.DS_Store
+*.dmg
+
+# Environment
+.env
+.env.*
+
+# Editor
+.vscode/
+.idea/
+*.swp
