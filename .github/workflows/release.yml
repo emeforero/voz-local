@@ -1,0 +1,60 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  build-macos:
+    runs-on: macos-latest
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-darwin
+
+      - name: Cache Rust dependencies
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - name: Install Node dependencies
+        run: npm ci
+
+      - name: Build Tauri app (Apple Silicon)
+        run: npm run tauri build -- --target aarch64-apple-darwin
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ""
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ""
+
+      - name: Upload DMG to Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: "Voz Local ${{ github.ref_name }}"
+          body: |
+            ## Instalación
+
+            1. Descarga el `.dmg`
+            2. Ábrelo y arrastra **Voz Local** a Aplicaciones
+            3. **Primera vez:** clic derecho → Abrir (macOS bloqueará una app sin firma de Apple)
+            4. Concede permisos de **Micrófono** y **Accesibilidad**
+            5. Descarga el modelo Whisper desde la pantalla de bienvenida
+            6. ¡Listo! Usa `Alt+Space` para dictar
+
+            > Requiere macOS 12+ · Apple Silicon (M1/M2/M3/M4)
+          files: |
+            src-tauri/target/aarch64-apple-darwin/release/bundle/dmg/*.dmg
+          draft: false
+          prerelease: false
