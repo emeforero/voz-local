@@ -18,6 +18,7 @@
     audio_filename: string | null; duration_secs: number;
   }
   interface ModelInfo { id: string; name: string; size_mb: number; downloaded: boolean; }
+  interface DownloadProgress { model_id: string; downloaded_mb: number; total_mb: number; percent: number; }
 
   let settings = $state<Settings>({
     shortcut: "Alt+Space", push_to_talk: true, selected_language: "auto",
@@ -25,6 +26,8 @@
     onboarding_done: false, widget_position: "center",
   });
   let view = $state<"onboarding" | "settings" | "history">("settings");
+  // onboarding has two steps: "perms" then "models"
+  let obStep = $state<"perms" | "models">("perms");
   let models = $state<ModelInfo[]>([]);
   let history = $state<HistoryEntry[]>([]);
   let playingId = $state<string | null>(null);
@@ -35,6 +38,9 @@
   let pollInterval: ReturnType<typeof setInterval> | null = null;
   let initialized = false;
   let saveTimer: ReturnType<typeof setTimeout> | null = null;
+  // Download state keyed by model_id
+  let downloadProgress = $state<Record<string, DownloadProgress>>({});
+  let downloadErrors = $state<Record<string, string>>({});
 
   const LANGUAGES = [
     { value: "auto", label: "Automático" },
@@ -70,6 +76,21 @@
       await listen("transcription-done", async () => {
         if (view === "history") history = await invoke("get_history");
       }),
+      await listen<DownloadProgress>("download-progress", ({ payload }) => {
+        downloadProgress = { ...downloadProgress, [payload.model_id]: payload };
+      }),
+      await listen<string>("download-complete", async ({ payload: modelId }) => {
+        delete downloadProgress[modelId];
+        downloadProgress = { ...downloadProgress };
+        delete downloadErrors[modelId];
+        downloadErrors = { ...downloadErrors };
+        models = await invoke("get_models");
+        // Auto-select the downloaded model if none selected yet
+        if (!models.some(m => m.downloaded && m.id === settings.selected_model)) {
+          settings.selected_model = modelId;
+          schedSave();
+        }
+      }),
     );
 
     initialized = true;
@@ -93,6 +114,18 @@
   async function checkPerms() {
     micGranted  = await invoke<boolean>("check_mic_permission");
     a11yGranted = await invoke<boolean>("check_accessibility_permission");
+  }
+
+  async function startDownload(modelId: string) {
+    delete downloadErrors[modelId];
+    downloadErrors = { ...downloadErrors };
+    try {
+      await invoke("download_model", { modelId });
+    } catch (e: unknown) {
+      downloadErrors = { ...downloadErrors, [modelId]: String(e) };
+      delete downloadProgress[modelId];
+      downloadProgress = { ...downloadProgress };
+    }
   }
 
   async function finishOnboarding() {
@@ -149,47 +182,100 @@
   <!-- ── ONBOARDING ── -->
   {#if view === "onboarding"}
   <div class="ob">
-    <div class="ob-intro">
-      <h1>Bienvenido</h1>
-      <p>Voz a texto local en tu Mac.<br>Necesitamos dos permisos para funcionar.</p>
+    <div class="ob-steps">
+      <div class="ob-step-dot" class:active={obStep === "perms"}></div>
+      <div class="ob-step-dot" class:active={obStep === "models"}></div>
     </div>
 
-    <div class="perm-list">
-      <div class="perm-row" class:granted={micGranted}>
-        <div class="perm-dot" class:granted={micGranted}></div>
-        <div class="perm-info">
-          <strong>Micrófono</strong>
-          <span>Para capturar tu voz</span>
-        </div>
-        {#if micGranted}
-          <span class="perm-status ok">Concedido</span>
-        {:else}
-          <button class="link-btn" onclick={() => invoke("open_microphone_settings")}>Abrir ajustes</button>
-        {/if}
+    {#if obStep === "perms"}
+      <div class="ob-intro">
+        <h1>Bienvenido</h1>
+        <p>Voz a texto local en tu Mac.<br>Necesitamos dos permisos para funcionar.</p>
       </div>
 
-      <div class="perm-row" class:granted={a11yGranted}>
-        <div class="perm-dot" class:granted={a11yGranted}></div>
-        <div class="perm-info">
-          <strong>Accesibilidad</strong>
-          <span>Para pegar donde escribes</span>
+      <div class="perm-list">
+        <div class="perm-row" class:granted={micGranted}>
+          <div class="perm-dot" class:granted={micGranted}></div>
+          <div class="perm-info">
+            <strong>Micrófono</strong>
+            <span>Para capturar tu voz</span>
+          </div>
+          {#if micGranted}
+            <span class="perm-status ok">Concedido</span>
+          {:else}
+            <button class="link-btn" onclick={() => invoke("open_microphone_settings")}>Abrir ajustes</button>
+          {/if}
         </div>
-        {#if a11yGranted}
-          <span class="perm-status ok">Concedido</span>
-        {:else}
-          <button class="link-btn" onclick={() => invoke("open_accessibility_settings")}>Abrir ajustes</button>
-        {/if}
-      </div>
-    </div>
 
-    <div class="ob-foot">
-      {#if !a11yGranted && micGranted}
-        <p class="hint">Sin accesibilidad, el texto se copia al portapapeles automáticamente.</p>
-      {/if}
-      <button class="btn-primary" disabled={!micGranted} onclick={finishOnboarding}>
-        {micGranted ? "Empezar" : "Esperando permiso de micrófono…"}
-      </button>
-    </div>
+        <div class="perm-row" class:granted={a11yGranted}>
+          <div class="perm-dot" class:granted={a11yGranted}></div>
+          <div class="perm-info">
+            <strong>Accesibilidad</strong>
+            <span>Para pegar donde escribes</span>
+          </div>
+          {#if a11yGranted}
+            <span class="perm-status ok">Concedido</span>
+          {:else}
+            <button class="link-btn" onclick={() => invoke("open_accessibility_settings")}>Abrir ajustes</button>
+          {/if}
+        </div>
+      </div>
+
+      <div class="ob-foot">
+        {#if !a11yGranted && micGranted}
+          <p class="hint">Sin accesibilidad, el texto se copia al portapapeles automáticamente.</p>
+        {/if}
+        <button class="btn-primary" disabled={!micGranted}
+                onclick={() => { if (pollInterval) { clearInterval(pollInterval); pollInterval = null; } obStep = "models"; }}>
+          {micGranted ? "Continuar" : "Esperando permiso de micrófono…"}
+        </button>
+      </div>
+
+    {:else}
+      <!-- Step 2: download a model -->
+      <div class="ob-intro">
+        <h1>Descargar modelo</h1>
+        <p>Elige el modelo de reconocimiento.<br>Se guarda en tu Mac y funciona sin internet.</p>
+      </div>
+
+      <div class="model-list">
+        {#each models as m}
+          {@const prog = downloadProgress[m.id]}
+          {@const err  = downloadErrors[m.id]}
+          <div class="model-row">
+            <div class="model-info">
+              <strong>{m.name}</strong>
+              <span>{m.size_mb} MB</span>
+            </div>
+            <div class="model-action">
+              {#if m.downloaded}
+                <span class="perm-status ok">Instalado</span>
+              {:else if prog}
+                <div class="dl-progress">
+                  <div class="dl-bar" style="width:{prog.percent}%"></div>
+                </div>
+                <span class="dl-pct">{Math.round(prog.percent)}%</span>
+              {:else}
+                <button class="link-btn" onclick={() => startDownload(m.id)}>
+                  Descargar
+                </button>
+              {/if}
+            </div>
+            {#if err}
+              <p class="dl-error">{err}</p>
+            {/if}
+          </div>
+        {/each}
+      </div>
+
+      <div class="ob-foot">
+        <p class="hint">Puedes descargar más modelos desde Ajustes en cualquier momento.</p>
+        <button class="btn-primary" disabled={!models.some(m => m.downloaded)} onclick={finishOnboarding}>
+          {models.some(m => m.downloaded) ? "Empezar" : "Descarga al menos un modelo…"}
+        </button>
+      </div>
+    {/if}
+
   </div>
   {/if}
 
@@ -198,18 +284,17 @@
   <div class="scroll">
 
     {#if !a11yGranted}
-    <div class="banner" onclick={() => invoke("open_accessibility_settings")} role="button" tabindex="0">
+    <button class="banner" onclick={() => invoke("open_accessibility_settings")}>
       <span class="banner-dot"></span>
       <span>El pegado automático requiere permiso de Accesibilidad.</span>
       <span class="banner-link">Abrir ajustes →</span>
-    </div>
+    </button>
     {:else}
-    <div class="banner ok" role="button" tabindex="0"
-         onclick={async () => { pasteStatus = await invoke("test_paste"); }}>
+    <button class="banner ok" onclick={async () => { pasteStatus = await invoke("test_paste"); }}>
       <span class="banner-dot ok"></span>
       <span>Accesibilidad concedida.</span>
       <span class="banner-link">{pasteStatus ? `Estado: ${pasteStatus}` : "Probar pegado →"}</span>
-    </div>
+    </button>
     {/if}
 
     <section>
@@ -284,15 +369,33 @@
     </section>
 
     <section>
-      <h2 class="section-label">Modelos instalados</h2>
+      <h2 class="section-label">Modelos</h2>
       <div class="rows">
         {#each models as m, i}
-          <div class="row">
-            <div>
+          {@const prog = downloadProgress[m.id]}
+          {@const err  = downloadErrors[m.id]}
+          <div class="row model-settings-row" style="flex-wrap:wrap; gap:8px;">
+            <div style="flex:1; min-width:0;">
               <span class="row-label">{m.name}</span>
               <span class="meta">{m.size_mb} MB</span>
             </div>
-            <span class="badge" class:installed={m.downloaded}>{m.downloaded ? "Instalado" : "No instalado"}</span>
+            <div class="model-action" style="flex-shrink:0;">
+              {#if m.downloaded}
+                <span class="badge installed">Instalado</span>
+              {:else if prog}
+                <div class="dl-inline">
+                  <div class="dl-bar-wrap">
+                    <div class="dl-bar" style="width:{prog.percent}%"></div>
+                  </div>
+                  <span class="dl-pct">{Math.round(prog.percent)}%</span>
+                </div>
+              {:else}
+                <button class="link-btn" onclick={() => startDownload(m.id)}>Descargar</button>
+              {/if}
+            </div>
+            {#if err}
+              <p class="dl-error" style="width:100%; padding:0 0 6px;">{err}</p>
+            {/if}
           </div>
           {#if i < models.length - 1}<div class="sep"></div>{/if}
         {/each}
@@ -566,6 +669,7 @@
     padding:10px 13px; cursor:pointer;
     font-size:12px; color:var(--muted);
     transition:background .15s;
+    border:none; width:100%; text-align:left;
   }
   .banner:hover{ background:rgba(232,85,53,0.12); }
   .banner.ok{ background:rgba(123,155,210,0.07); }
@@ -594,4 +698,39 @@
     border-radius:4px; padding:1px 5px;
     font-size:11px; font-family:inherit; color:var(--muted);
   }
+
+  /* ── Model list (onboarding step 2) ── */
+  .model-list{ display:flex; flex-direction:column; }
+  .model-row{
+    display:flex; align-items:center; gap:12px;
+    padding:14px 0; border-bottom:1px solid var(--line);
+    flex-wrap:wrap;
+  }
+  .model-row:first-child{ border-top:1px solid var(--line); }
+  .model-info{ flex:1; display:flex; flex-direction:column; gap:2px; }
+  .model-info strong{ font-size:13px; font-weight:550; color:var(--text); }
+  .model-info span{ font-size:11px; color:var(--faint); }
+  .model-action{ display:flex; align-items:center; gap:8px; flex-shrink:0; }
+
+  /* ── Download progress bar ── */
+  .dl-inline{ display:flex; align-items:center; gap:7px; }
+  .dl-bar-wrap{
+    width:80px; height:4px; background:rgba(0,0,0,.08);
+    border-radius:2px; overflow:hidden;
+  }
+  .dl-bar{
+    height:100%; background:var(--coral);
+    border-radius:2px; transition:width .3s linear;
+  }
+  .dl-pct{ font-size:11px; color:var(--faint); width:30px; text-align:right; }
+  .dl-error{ font-size:11px; color:var(--coral); width:100%; padding-bottom:6px; }
+
+  /* Onboarding step progress dots */
+  .ob-steps{ display:flex; gap:5px; justify-content:center; }
+  .ob-step-dot{
+    width:5px; height:5px; border-radius:50%;
+    background:rgba(0,0,0,.15);
+    transition:background .2s;
+  }
+  .ob-step-dot.active{ background:var(--coral); }
 </style>

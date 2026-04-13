@@ -149,20 +149,17 @@ pub async fn stop_and_transcribe_internal<R: Runtime>(app: AppHandle<R>) {
         settings.selected_model.clone()
     };
 
-    let model_path = app
-        .path()
-        .resource_dir()
-        .map(|p| p.join(format!("resources/models/ggml-{}.bin", model_name)));
+    let model_path = models_dir(&app).map(|p| p.join(format!("ggml-{}.bin", model_name)));
 
     let model_path = match model_path {
-        Ok(p) if p.exists() => p,
+        Some(p) if p.exists() => p,
         _ => {
             // Fallback to base
-            match app.path().resource_dir().map(|p| p.join("resources/models/ggml-base.bin")) {
-                Ok(p) if p.exists() => p,
+            match models_dir(&app).map(|p| p.join("ggml-base.bin")) {
+                Some(p) if p.exists() => p,
                 _ => {
                     app.emit("transcribing", false).ok();
-                    app.emit("transcribe-error", "Modelo no encontrado").ok();
+                    app.emit("transcribe-error", "Modelo no encontrado. Descárgalo en Ajustes → Modelos.").ok();
                     return;
                 }
             }
@@ -288,13 +285,16 @@ pub fn get_recording_audio<R: Runtime>(app: AppHandle<R>, filename: String) -> O
 
 // ── Models ─────────────────────────────────────────────────────────────────
 
+fn models_dir<R: Runtime>(app: &AppHandle<R>) -> Option<std::path::PathBuf> {
+    app.path().app_data_dir().ok().map(|p| p.join("models"))
+}
+
 #[tauri::command]
 pub fn get_models<R: Runtime>(app: AppHandle<R>) -> Vec<ModelInfo> {
-    let res_dir = app.path().resource_dir().ok();
+    let dir = models_dir(&app);
     let model_exists = |name: &str| {
-        res_dir
-            .as_ref()
-            .map(|p| p.join(format!("resources/models/ggml-{}.bin", name)).exists())
+        dir.as_ref()
+            .map(|p| p.join(format!("ggml-{}.bin", name)).exists())
             .unwrap_or(false)
     };
 
@@ -312,6 +312,59 @@ pub fn get_models<R: Runtime>(app: AppHandle<R>) -> Vec<ModelInfo> {
             downloaded: model_exists("base"),
         },
     ]
+}
+
+#[tauri::command]
+pub async fn download_model<R: Runtime>(app: AppHandle<R>, model_id: String) -> Result<(), String> {
+    let url = match model_id.as_str() {
+        "large-v3-turbo" => "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-large-v3-turbo.bin",
+        "base"           => "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.bin",
+        other            => return Err(format!("Modelo desconocido: {}", other)),
+    };
+
+    let dir = models_dir(&app).ok_or("No se pudo obtener el directorio de datos")?;
+    std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+
+    let dest = dir.join(format!("ggml-{}.bin", model_id));
+    let tmp  = dir.join(format!("ggml-{}.bin.tmp", model_id));
+
+    let client = reqwest::Client::builder()
+        .user_agent("voz-local/0.1")
+        .build()
+        .map_err(|e| e.to_string())?;
+
+    let resp = client.get(url).send().await.map_err(|e| e.to_string())?;
+    if !resp.status().is_success() {
+        return Err(format!("HTTP {}", resp.status()));
+    }
+
+    let total = resp.content_length().unwrap_or(0);
+    let mut downloaded: u64 = 0;
+
+    let mut file = tokio::fs::File::create(&tmp).await.map_err(|e| e.to_string())?;
+    let mut stream = resp.bytes_stream();
+
+    use futures_util::StreamExt;
+    use tokio::io::AsyncWriteExt;
+
+    while let Some(chunk) = stream.next().await {
+        let chunk = chunk.map_err(|e| e.to_string())?;
+        file.write_all(&chunk).await.map_err(|e| e.to_string())?;
+        downloaded += chunk.len() as u64;
+
+        let percent = if total > 0 { downloaded as f32 / total as f32 * 100.0 } else { 0.0 };
+        app.emit("download-progress", serde_json::json!({
+            "model_id": model_id,
+            "downloaded_mb": downloaded as f32 / 1_048_576.0,
+            "total_mb":      total      as f32 / 1_048_576.0,
+            "percent":       percent,
+        })).ok();
+    }
+
+    drop(file);
+    tokio::fs::rename(&tmp, &dest).await.map_err(|e| e.to_string())?;
+    app.emit("download-complete", &model_id).ok();
+    Ok(())
 }
 
 #[tauri::command]

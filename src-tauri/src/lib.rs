@@ -30,6 +30,7 @@ pub fn run() {
             commands::stop_and_transcribe,
             commands::is_recording_cmd,
             commands::get_models,
+            commands::download_model,
             commands::check_update,
             commands::check_mic_permission,
             commands::check_accessibility_permission,
