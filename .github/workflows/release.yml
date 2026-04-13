@@ -38,6 +38,9 @@ jobs:
         env:
           TAURI_SIGNING_PRIVATE_KEY: ""
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ""
+          # whisper.cpp uses i8mm intrinsics — tell clang to target Apple M1 explicitly
+          CFLAGS: "-mcpu=apple-m1"
+          CXXFLAGS: "-mcpu=apple-m1"
 
       - name: Upload DMG to Release
         uses: softprops/action-gh-release@v2
