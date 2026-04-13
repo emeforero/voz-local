@@ -31,11 +31,27 @@ jobs:
       - name: Install Node dependencies
         run: npm ci
 
-      - name: Build Tauri app
-        run: npm run tauri build
+      - name: Build Tauri app bundle
+        run: npm run tauri build -- --bundles app
         env:
           TAURI_SIGNING_PRIVATE_KEY: ""
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ""
+
+      - name: Ad-hoc sign app bundle
+        run: |
+          codesign --deep --force --sign - \
+            --entitlements src-tauri/entitlements.plist \
+            "src-tauri/target/release/bundle/macos/Voz Local.app"
+
+      - name: Create DMG
+        run: |
+          VERSION=$(grep '^version' src-tauri/Cargo.toml | head -1 | cut -d'"' -f2)
+          mkdir -p "src-tauri/target/release/bundle/dmg"
+          hdiutil create \
+            -volname "Voz Local" \
+            -srcfolder "src-tauri/target/release/bundle/macos/Voz Local.app" \
+            -ov -format UDZO \
+            "src-tauri/target/release/bundle/dmg/Voz Local_${VERSION}_aarch64.dmg"
 
       - name: Upload DMG to Release
         uses: softprops/action-gh-release@v2
@@ -46,10 +62,12 @@ jobs:
 
             1. Descarga el `.dmg`
             2. Ábrelo y arrastra **Voz Local** a Aplicaciones
-            3. **Primera vez:** clic derecho → Abrir (macOS bloqueará una app sin firma de Apple)
+            3. **Primera vez:** clic derecho → Abrir (macOS pedirá confirmación porque la app no está notarizada)
             4. Concede permisos de **Micrófono** y **Accesibilidad**
             5. Descarga el modelo Whisper desde la pantalla de bienvenida
             6. ¡Listo! Usa `Alt+Space` para dictar
+
+            > Si macOS dice "dañado": abre Terminal y ejecuta `sudo xattr -cr /Applications/Voz\ Local.app`
 
             > Requiere macOS 12+ · Apple Silicon (M1/M2/M3/M4)
           files: |

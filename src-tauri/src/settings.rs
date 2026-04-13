@@ -1,6 +1,7 @@
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::PathBuf;
+use std::sync::Mutex;
 use tauri::{AppHandle, Manager, Runtime};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -10,7 +11,6 @@ pub struct AppSettings {
     pub selected_language: String,
     pub selected_model: String,
     pub autostart: bool,
-    pub audio_feedback: bool,
     pub onboarding_done: bool,
     pub widget_position: String, // "center" | "left" | "right"
 }
@@ -23,12 +23,14 @@ impl Default for AppSettings {
             selected_language: "auto".to_string(),
             selected_model: "large-v3-turbo".to_string(),
             autostart: false,
-            audio_feedback: true,
             onboarding_done: false,
             widget_position: "center".to_string(),
         }
     }
 }
+
+// In-process cache so shortcut handlers don't hit disk on every key event.
+static CACHE: Mutex<Option<AppSettings>> = Mutex::new(None);
 
 fn settings_path<R: Runtime>(app: &AppHandle<R>) -> PathBuf {
     app.path()
@@ -50,15 +52,22 @@ pub fn init<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<()> {
 }
 
 pub fn load<R: Runtime>(app: &AppHandle<R>) -> AppSettings {
+    if let Some(cached) = CACHE.lock().unwrap().as_ref() {
+        return cached.clone();
+    }
     let path = settings_path(app);
-    fs::read_to_string(&path)
+    let settings: AppSettings = fs::read_to_string(&path)
         .ok()
         .and_then(|s| serde_json::from_str(&s).ok())
-        .unwrap_or_default()
+        .unwrap_or_default();
+    *CACHE.lock().unwrap() = Some(settings.clone());
+    settings
 }
 
 pub fn save<R: Runtime>(app: &AppHandle<R>, settings: &AppSettings) -> tauri::Result<()> {
     let path = settings_path(app);
     let json = serde_json::to_string_pretty(settings).unwrap();
-    fs::write(path, json).map_err(|e| tauri::Error::Anyhow(e.into()))
+    fs::write(path, json).map_err(|e| tauri::Error::Anyhow(e.into()))?;
+    *CACHE.lock().unwrap() = Some(settings.clone());
+    Ok(())
 }

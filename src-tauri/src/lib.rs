@@ -31,7 +31,6 @@ pub fn run() {
             commands::is_recording_cmd,
             commands::get_models,
             commands::download_model,
-            commands::check_update,
             commands::check_mic_permission,
             commands::check_accessibility_permission,
             commands::open_accessibility_settings,
@@ -53,6 +52,7 @@ pub fn run() {
         })
         .setup(|app| {
             settings::init(app.handle())?;
+            history::init(app.handle());
             setup_tray(app.handle())?;
             shortcut::register(app.handle())?;
 

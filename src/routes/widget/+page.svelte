@@ -7,6 +7,7 @@
 
   let phase = $state<Phase>("recording");
   let levels = $state<number[]>(Array(18).fill(0.04));
+  let hideTimer: ReturnType<typeof setTimeout> | null = null;
 
   const unlisten: (() => void)[] = [];
 
@@ -24,16 +25,19 @@
       }),
       await listen<string>("transcription-done", () => {
         phase = "done";
-        setTimeout(() => invoke("hide_widget"), 1000);
+        hideTimer = setTimeout(() => invoke("hide_widget"), 1000);
       }),
       await listen<string>("transcribe-error", () => {
         phase = "error";
-        setTimeout(() => invoke("hide_widget"), 2000);
+        hideTimer = setTimeout(() => invoke("hide_widget"), 2000);
       }),
     );
   });
 
-  onDestroy(() => unlisten.forEach(fn => fn()));
+  onDestroy(() => {
+    if (hideTimer) clearTimeout(hideTimer);
+    unlisten.forEach(fn => fn());
+  });
 
   function barH(v: number, i: number): number {
     const n = levels.length;

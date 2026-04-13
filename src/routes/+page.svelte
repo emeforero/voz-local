@@ -9,7 +9,6 @@
     selected_language: string;
     selected_model: string;
     autostart: boolean;
-    audio_feedback: boolean;
     onboarding_done: boolean;
     widget_position: string;
   }
@@ -22,7 +21,7 @@
 
   let settings = $state<Settings>({
     shortcut: "Alt+Space", push_to_talk: true, selected_language: "auto",
-    selected_model: "large-v3-turbo", autostart: false, audio_feedback: true,
+    selected_model: "large-v3-turbo", autostart: false,
     onboarding_done: false, widget_position: "center",
   });
   let view = $state<"onboarding" | "settings" | "history">("settings");

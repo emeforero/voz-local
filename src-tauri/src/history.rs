@@ -17,9 +17,11 @@ fn history_path<R: Runtime>(app: &AppHandle<R>) -> PathBuf {
 }
 
 fn recordings_dir<R: Runtime>(app: &AppHandle<R>) -> PathBuf {
-    let dir = app.path().app_data_dir().unwrap().join("recordings");
-    fs::create_dir_all(&dir).ok();
-    dir
+    app.path().app_data_dir().unwrap().join("recordings")
+}
+
+pub fn init<R: Runtime>(app: &AppHandle<R>) {
+    fs::create_dir_all(recordings_dir(app)).ok();
 }
 
 pub fn load<R: Runtime>(app: &AppHandle<R>) -> Vec<HistoryEntry> {

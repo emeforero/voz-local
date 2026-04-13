@@ -9,6 +9,12 @@ use crate::transcription::AudioCapture;
 static IS_RECORDING: AtomicBool = AtomicBool::new(false);
 static CAPTURE: Mutex<Option<AudioCapture>> = Mutex::new(None);
 
+#[cfg(target_os = "macos")]
+fn ax_is_trusted() -> bool {
+    extern "C" { fn AXIsProcessTrusted() -> bool; }
+    unsafe { AXIsProcessTrusted() }
+}
+
 // ── Permission checks ──────────────────────────────────────────────────────
 
 #[tauri::command]
@@ -19,10 +25,7 @@ pub fn check_mic_permission() -> bool {
 #[tauri::command]
 pub fn check_accessibility_permission() -> bool {
     #[cfg(target_os = "macos")]
-    {
-        extern "C" { fn AXIsProcessTrusted() -> bool; }
-        unsafe { AXIsProcessTrusted() }
-    }
+    { ax_is_trusted() }
     #[cfg(not(target_os = "macos"))]
     { true }
 }
@@ -212,9 +215,7 @@ pub async fn stop_and_transcribe_internal<R: Runtime>(app: AppHandle<R>) {
 pub fn test_paste() -> String {
     #[cfg(target_os = "macos")]
     {
-        extern "C" { fn AXIsProcessTrusted() -> bool; }
-        let trusted = unsafe { AXIsProcessTrusted() };
-        if !trusted {
+        if !ax_is_trusted() {
             return "no_accessibility".to_string();
         }
         // Try posting a harmless zero-length CGEvent to verify the API works
@@ -365,11 +366,6 @@ pub async fn download_model<R: Runtime>(app: AppHandle<R>, model_id: String) -> 
     tokio::fs::rename(&tmp, &dest).await.map_err(|e| e.to_string())?;
     app.emit("download-complete", &model_id).ok();
     Ok(())
-}
-
-#[tauri::command]
-pub async fn check_update<R: Runtime>(_app: AppHandle<R>) -> Result<String, String> {
-    Ok("Ya tienes la versión más reciente".to_string())
 }
 
 // ── Internals ──────────────────────────────────────────────────────────────
