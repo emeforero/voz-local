@@ -7,7 +7,7 @@ on:
 
 jobs:
   build-macos:
-    runs-on: macos-latest
+    runs-on: macos-14  # Apple Silicon (M1) — native arm64, no cross-compilation needed
     permissions:
       contents: write
 
@@ -22,8 +22,6 @@ jobs:
 
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: aarch64-apple-darwin
 
       - name: Cache Rust dependencies
         uses: Swatinem/rust-cache@v2
@@ -33,14 +31,11 @@ jobs:
       - name: Install Node dependencies
         run: npm ci
 
-      - name: Build Tauri app (Apple Silicon)
-        run: npm run tauri build -- --target aarch64-apple-darwin
+      - name: Build Tauri app
+        run: npm run tauri build
         env:
           TAURI_SIGNING_PRIVATE_KEY: ""
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ""
-          # whisper.cpp uses i8mm intrinsics — tell clang to target Apple M1 explicitly
-          CFLAGS: "-mcpu=apple-m1"
-          CXXFLAGS: "-mcpu=apple-m1"
 
       - name: Upload DMG to Release
         uses: softprops/action-gh-release@v2
@@ -58,6 +53,6 @@ jobs:
 
             > Requiere macOS 12+ · Apple Silicon (M1/M2/M3/M4)
           files: |
-            src-tauri/target/aarch64-apple-darwin/release/bundle/dmg/*.dmg
+            src-tauri/target/release/bundle/dmg/*.dmg
           draft: false
           prerelease: false
