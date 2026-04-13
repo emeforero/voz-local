@@ -22,3 +22,7 @@ src-tauri/gen/
 .vscode/
 .idea/
 *.swp
+
+# Whisper models (too large for GitHub — bundled in the DMG release)
+src-tauri/resources/models/*.bin
+src-tauri/resources/models/*.onnx
