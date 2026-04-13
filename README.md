@@ -28,11 +28,12 @@ Presiona el atajo de teclado, habla, y el texto aparece donde está tu cursor �
 
 ## Instalación
 
-1. Descarga el `.dmg` desde [Releases](../../releases/latest)
+1. Descarga el `.dmg` desde [Releases](../../releases/latest) (~10 MB)
 2. Abre el `.dmg` y arrastra **Voz Local** a Aplicaciones
 3. Abre la app — aparece en la barra de menú (no en el Dock)
-4. En la pantalla de bienvenida, concede los permisos de **Micrófono** y **Accesibilidad**
-5. ¡Listo! Presiona `Alt+Space` para dictar
+4. Concede los permisos de **Micrófono** y **Accesibilidad**
+5. Descarga el modelo Whisper de tu elección desde la pantalla de bienvenida
+6. ¡Listo! Presiona `Alt+Space` para dictar
 
 ---
 
@@ -54,7 +55,7 @@ Presiona el atajo de teclado, habla, y el texto aparece donde está tu cursor �
 | Whisper Large v3 Turbo | 809 MB | ★★★★☆ | ★★★★★ |
 | Whisper Base | 141 MB | ★★★★★ | ★★★☆☆ |
 
-Los modelos se incluyen en el bundle de la app.
+Los modelos **no** se incluyen en el instalador. Al abrir la app por primera vez, elige y descarga el modelo que prefieras directamente desde la pantalla de bienvenida. Se guardan en `~/Library/Application Support/com.vozlocal.app/models/` y funcionan sin conexión a internet una vez descargados.
 
 ---
 
