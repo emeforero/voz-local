@@ -97,7 +97,9 @@ pub fn transcribe(
     if needs_load {
         eprintln!("[voz-local] loading model: {model_path}");
         let mut ctx_params = WhisperContextParameters::default();
-        ctx_params.use_gpu(true);  // Metal GPU on Apple Silicon
+        // Metal GPU only available on Apple Silicon; x86_64 falls back to CPU.
+        #[cfg(target_arch = "aarch64")]
+        ctx_params.use_gpu(true);
         let ctx = WhisperContext::new_with_params(model_path, ctx_params)?;
         *cache = Some((model_path.to_string(), ctx));
     }

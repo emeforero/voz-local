@@ -6,8 +6,9 @@ on:
       - "v*"
 
 jobs:
-  build-macos:
-    runs-on: macos-14  # Apple Silicon (M1) — native arm64, no cross-compilation needed
+  # ── Apple Silicon (aarch64) ─────────────────────────────────────────────────
+  build-arm64:
+    runs-on: macos-14   # GitHub-hosted Apple Silicon (M1) runner
     permissions:
       contents: write
 
@@ -31,7 +32,7 @@ jobs:
       - name: Install Node dependencies
         run: npm ci
 
-      - name: Build Tauri app bundle
+      - name: Build Tauri app bundle (arm64)
         run: npm run tauri build -- --bundles app
         env:
           TAURI_SIGNING_PRIVATE_KEY: ""
@@ -43,7 +44,7 @@ jobs:
             --entitlements src-tauri/entitlements.plist \
             "src-tauri/target/release/bundle/macos/Voz Local.app"
 
-      - name: Create DMG
+      - name: Create DMG (aarch64)
         run: |
           VERSION=$(grep '^version' src-tauri/Cargo.toml | head -1 | cut -d'"' -f2)
           mkdir -p "src-tauri/target/release/bundle/dmg"
@@ -58,18 +59,80 @@ jobs:
         with:
           name: "Voz Local ${{ github.ref_name }}"
           body: |
-            ## Installation
+            ## Descarga
 
-            1. Download the `.dmg`
-            2. Open it and drag **Voz Local** to Applications
-            3. **First launch:** right-click → Open (macOS will ask for confirmation since the app is not notarized)
-            4. Grant **Microphone** and **Accessibility** permissions
-            5. Download a Whisper model from the welcome screen
-            6. Press `Alt+Space` to start dictating
+            Elige el DMG para tu Mac:
+            - **Apple Silicon (M1/M2/M3/M4):** `Voz Local_*_aarch64.dmg`
+            - **Intel Mac:** `Voz Local_*_x86_64.dmg`
 
-            > If macOS says the app is damaged: open Terminal and run `sudo xattr -cr /Applications/Voz\ Local.app`
+            ## Instalación
 
-            > Requires macOS 14 (Sonoma) or later · Apple Silicon (M1/M2/M3/M4)
+            1. Abre el `.dmg` y arrastra **Voz Local** a Aplicaciones
+            2. **Primer arranque:** clic derecho → Abrir (la app no está notarizada)
+            3. Concede permisos de **Micrófono** y **Accesibilidad**
+            4. Descarga un modelo Whisper desde la pantalla de bienvenida
+            5. Pulsa `Alt+Espacio` para empezar a dictar
+
+            > Si macOS dice que la app está dañada: `sudo xattr -cr /Applications/Voz\ Local.app`
+
+            > Requiere macOS 11 (Big Sur) o superior · Apple Silicon e Intel
+          files: |
+            src-tauri/target/release/bundle/dmg/*.dmg
+          draft: false
+          prerelease: false
+
+  # ── Intel (x86_64) ──────────────────────────────────────────────────────────
+  build-x86_64:
+    needs: [build-arm64]  # ensures release is created before we append the x86_64 DMG
+    runs-on: macos-13   # Last GitHub-hosted Intel runner
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Rust dependencies
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - name: Install Node dependencies
+        run: npm ci
+
+      - name: Build Tauri app bundle (x86_64)
+        run: npm run tauri build -- --bundles app
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ""
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ""
+
+      - name: Ad-hoc sign app bundle
+        run: |
+          codesign --deep --force --sign - \
+            --entitlements src-tauri/entitlements.plist \
+            "src-tauri/target/release/bundle/macos/Voz Local.app"
+
+      - name: Create DMG (x86_64)
+        run: |
+          VERSION=$(grep '^version' src-tauri/Cargo.toml | head -1 | cut -d'"' -f2)
+          mkdir -p "src-tauri/target/release/bundle/dmg"
+          hdiutil create \
+            -volname "Voz Local" \
+            -srcfolder "src-tauri/target/release/bundle/macos/Voz Local.app" \
+            -ov -format UDZO \
+            "src-tauri/target/release/bundle/dmg/Voz Local_${VERSION}_x86_64.dmg"
+
+      - name: Upload DMG to Release
+        uses: softprops/action-gh-release@v2
+        with:
           files: |
             src-tauri/target/release/bundle/dmg/*.dmg
           draft: false
