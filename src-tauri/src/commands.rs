@@ -114,14 +114,8 @@ pub async fn stop_and_transcribe_internal<R: Runtime>(app: AppHandle<R>) {
     app.emit("transcribing", true).ok();
     let (samples, sample_rate) = cap.stop();
 
-    eprintln!(
-        "[voz-local] samples: {}, rate: {}, rms: {:.6}",
-        samples.len(),
-        sample_rate,
-        if samples.is_empty() { 0.0 } else {
-            (samples.iter().map(|s| s * s).sum::<f32>() / samples.len() as f32).sqrt()
-        }
-    );
+    let rms = crate::transcription::rms_f32(&samples);
+    eprintln!("[voz-local] samples: {}, rate: {}, rms: {:.6}", samples.len(), sample_rate, rms);
 
     if samples.is_empty() {
         app.emit("transcribing", false).ok();
@@ -137,7 +131,6 @@ pub async fn stop_and_transcribe_internal<R: Runtime>(app: AppHandle<R>) {
         return;
     }
 
-    let rms = (samples.iter().map(|s| s * s).sum::<f32>() / samples.len() as f32).sqrt();
     if rms < 0.0001 {
         app.emit("transcribing", false).ok();
         app.emit("transcribe-error", "Audio silencioso — verifica permisos de micrófono").ok();
@@ -145,40 +138,49 @@ pub async fn stop_and_transcribe_internal<R: Runtime>(app: AppHandle<R>) {
     }
 
     let settings = settings::load(&app);
-
-    let model_name = if settings.selected_model.is_empty() {
-        "large-v3-turbo".to_string()
-    } else {
-        settings.selected_model.clone()
-    };
-
-    let model_path = models_dir(&app).map(|p| p.join(format!("ggml-{}.bin", model_name)));
-
-    let model_path = match model_path {
-        Some(p) if p.exists() => p,
-        _ => {
-            // Fallback to base
-            match models_dir(&app).map(|p| p.join("ggml-base.bin")) {
-                Some(p) if p.exists() => p,
-                _ => {
-                    app.emit("transcribing", false).ok();
-                    app.emit("transcribe-error", "Modelo no encontrado. Descárgalo en Ajustes → Modelos.").ok();
-                    return;
-                }
-            }
-        }
-    };
-
     let language = settings.selected_language.clone();
-    let samples_clone = samples.clone();
+    let custom_words = settings.custom_words.clone();
+    let word_correction_threshold = settings.word_correction_threshold;
+    let model_name = if settings.selected_model.is_empty() {
+        "large-v3-turbo"
+    } else {
+        settings.selected_model.as_str()
+    };
+
+    let Some(dir) = models_dir(&app) else {
+        app.emit("transcribing", false).ok();
+        app.emit("transcribe-error", "Modelo no encontrado. Descárgalo en Ajustes → Modelos.").ok();
+        return;
+    };
+    let primary  = dir.join(format!("ggml-{}.bin", model_name));
+    let fallback = dir.join("ggml-base.bin");
+    let model_path = if primary.exists() {
+        primary
+    } else if fallback.exists() {
+        fallback
+    } else {
+        app.emit("transcribing", false).ok();
+        app.emit("transcribe-error", "Modelo no encontrado. Descárgalo en Ajustes → Modelos.").ok();
+        return;
+    };
+
+    let Some(model_path_str) = model_path.to_str().map(str::to_owned) else {
+        app.emit("transcribing", false).ok();
+        app.emit("transcribe-error", "Ruta del modelo contiene caracteres inválidos").ok();
+        return;
+    };
+
     let app_clone = app.clone();
+    let samples_clone = samples.clone();
 
     let result = tokio::task::spawn_blocking(move || {
         crate::transcription::transcribe(
-            model_path.to_str().unwrap(),
+            &model_path_str,
             &samples_clone,
             sample_rate,
             &language,
+            &custom_words,
+            word_correction_threshold,
         )
     })
     .await;
@@ -190,8 +192,7 @@ pub async fn stop_and_transcribe_internal<R: Runtime>(app: AppHandle<R>) {
             history::save_entry(&app_clone, text.clone(), &samples, sample_rate);
             // Notify the widget FIRST so it starts its close countdown.
             app.emit("transcription-done", &text).ok();
-            // Wait 300ms for the previously-active app to regain keyboard focus,
-            // then copy to clipboard + simulate Cmd+V.
+            // 300ms: time for the previously-active app to regain keyboard focus before Cmd+V.
             let text_for_paste = text.clone();
             tokio::spawn(async move {
                 tokio::time::sleep(std::time::Duration::from_millis(300)).await;

@@ -11,6 +11,8 @@
     autostart: boolean;
     onboarding_done: boolean;
     widget_position: string;
+    custom_words: string;
+    word_correction_threshold: number;
   }
   interface HistoryEntry {
     id: string; timestamp_ms: number; text: string;
@@ -22,7 +24,8 @@
   let settings = $state<Settings>({
     shortcut: "Alt+Space", push_to_talk: true, selected_language: "auto",
     selected_model: "large-v3-turbo", autostart: false,
-    onboarding_done: false, widget_position: "center",
+    onboarding_done: false, widget_position: "center", custom_words: "",
+    word_correction_threshold: 0.85,
   });
   let view = $state<"onboarding" | "settings" | "history">("settings");
   // onboarding has two steps: "perms" then "models"
@@ -340,6 +343,29 @@
           </select>
         </div>
       </div>
+      <div class="words-block">
+        <span class="row-label">Vocabulario personalizado</span>
+        <textarea
+          class="words-ta"
+          bind:value={settings.custom_words}
+          oninput={() => schedSave()}
+          placeholder="GitHub, Claude Code, Node.js, TypeScript, npm, API..."
+          rows="3"
+        ></textarea>
+      </div>
+      <p class="section-hint">Palabras o frases que Whisper debe reconocer con precisión, separadas por comas.</p>
+      <div class="setting-row" style="margin-top:8px;">
+        <span class="row-label">Umbral de corrección</span>
+        <div class="threshold-ctrl">
+          <input
+            type="range" min="0.7" max="1.0" step="0.01"
+            bind:value={settings.word_correction_threshold}
+            oninput={() => schedSave()}
+          />
+          <span class="threshold-val">{(settings.word_correction_threshold ?? 0.85).toFixed(2)}</span>
+        </div>
+      </div>
+      <p class="section-hint">Qué tan parecida debe ser una palabra para corregirla. 0.85 recomendado — más alto = más estricto.</p>
     </section>
 
     <section>
@@ -723,6 +749,28 @@
   }
   .dl-pct{ font-size:11px; color:var(--faint); width:30px; text-align:right; }
   .dl-error{ font-size:11px; color:var(--coral); width:100%; padding-bottom:6px; }
+
+  /* ── Custom words textarea ── */
+  .words-block{
+    background:var(--panel);
+    border-radius:var(--r);
+    padding:10px 14px;
+    display:flex; flex-direction:column; gap:6px;
+    margin-top:1px;
+  }
+  .words-ta{
+    width:100%; resize:none;
+    font-size:12.5px; color:var(--muted);
+    background:var(--bg); border:1px solid var(--line);
+    border-radius:6px; padding:7px 9px;
+    outline:none; font-family:inherit; line-height:1.5;
+    transition:border-color .15s;
+  }
+  .words-ta:focus{ border-color:rgba(232,85,53,.4); }
+  .words-ta::placeholder{ color:var(--faint); }
+  .threshold-ctrl{ display:flex; align-items:center; gap:8px; flex:1; }
+  .threshold-ctrl input[type=range]{ flex:1; accent-color:var(--coral); }
+  .threshold-val{ font-size:11.5px; color:var(--muted); min-width:28px; text-align:right; }
 
   /* Onboarding step progress dots */
   .ob-steps{ display:flex; gap:5px; justify-content:center; }

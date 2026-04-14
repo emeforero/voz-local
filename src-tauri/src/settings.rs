@@ -13,7 +13,17 @@ pub struct AppSettings {
     pub autostart: bool,
     pub onboarding_done: bool,
     pub widget_position: String, // "center" | "left" | "right"
+    /// Passed to Whisper as initial_prompt to bias recognition toward these terms.
+    /// Comma or newline separated, e.g. "GitHub, Claude Code, Node.js, TypeScript"
+    #[serde(default)]
+    pub custom_words: String,
+    /// Jaro-Winkler similarity threshold for post-transcription word correction (0.0–1.0).
+    /// 0.85 catches obvious typos without false positives.
+    #[serde(default = "default_word_correction_threshold")]
+    pub word_correction_threshold: f32,
 }
+
+fn default_word_correction_threshold() -> f32 { 0.85 }
 
 impl Default for AppSettings {
     fn default() -> Self {
@@ -25,6 +35,8 @@ impl Default for AppSettings {
             autostart: false,
             onboarding_done: false,
             widget_position: "center".to_string(),
+            custom_words: String::new(),
+            word_correction_threshold: default_word_correction_threshold(),
         }
     }
 }

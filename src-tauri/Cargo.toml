@@ -1,6 +1,6 @@
 [package]
 name = "voz-local"
-version = "0.1.0"
+version = "1.5.0"
 description = "Voz Local - transcripción de voz a texto 100% local"
 authors = ["you"]
 edition = "2021"
@@ -32,6 +32,9 @@ cpal = "0.15"
 
 # Whisper transcription
 whisper-rs = { version = "0.14", features = ["metal"] }
+
+# String similarity (word correction, same crate Aztec Voice uses)
+strsim = "0.11"
 
 [target.'cfg(target_os = "macos")'.dependencies]
 objc2 = "0.6"
