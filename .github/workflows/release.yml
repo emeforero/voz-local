@@ -6,9 +6,10 @@ on:
       - "v*"
 
 jobs:
-  # ── Apple Silicon (aarch64) ─────────────────────────────────────────────────
-  build-arm64:
-    runs-on: macos-14   # GitHub-hosted Apple Silicon (M1) runner
+  build-macos:
+    # macos-14 = Apple Silicon (M1). We cross-compile for x86_64 from here
+    # because GitHub no longer offers free Intel (macos-13) runners.
+    runs-on: macos-14
     permissions:
       contents: write
 
@@ -24,6 +25,9 @@ jobs:
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
 
+      - name: Add x86_64 cross-compilation target
+        run: rustup target add x86_64-apple-darwin
+
       - name: Cache Rust dependencies
         uses: Swatinem/rust-cache@v2
         with:
@@ -32,29 +36,56 @@ jobs:
       - name: Install Node dependencies
         run: npm ci
 
-      - name: Build Tauri app bundle (arm64)
+      # ── arm64 (native) ─────────────────────────────────────────────────────
+
+      - name: Build arm64 app bundle
         run: npm run tauri build -- --bundles app
         env:
           TAURI_SIGNING_PRIVATE_KEY: ""
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ""
 
-      - name: Ad-hoc sign app bundle
+      - name: Sign arm64 bundle
         run: |
           codesign --deep --force --sign - \
             --entitlements src-tauri/entitlements.plist \
             "src-tauri/target/release/bundle/macos/Voz Local.app"
 
-      - name: Create DMG (aarch64)
+      - name: Create arm64 DMG
         run: |
           VERSION=$(grep '^version' src-tauri/Cargo.toml | head -1 | cut -d'"' -f2)
-          mkdir -p "src-tauri/target/release/bundle/dmg"
+          mkdir -p dist
           hdiutil create \
             -volname "Voz Local" \
             -srcfolder "src-tauri/target/release/bundle/macos/Voz Local.app" \
             -ov -format UDZO \
-            "src-tauri/target/release/bundle/dmg/Voz Local_${VERSION}_aarch64.dmg"
+            "dist/Voz Local_${VERSION}_aarch64.dmg"
 
-      - name: Upload DMG to Release
+      # ── x86_64 (cross-compiled from arm64) ─────────────────────────────────
+
+      - name: Build x86_64 app bundle (cross-compiled)
+        run: npm run tauri build -- --target x86_64-apple-darwin --bundles app
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ""
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ""
+
+      - name: Sign x86_64 bundle
+        run: |
+          codesign --deep --force --sign - \
+            --entitlements src-tauri/entitlements.plist \
+            "src-tauri/target/x86_64-apple-darwin/release/bundle/macos/Voz Local.app"
+
+      - name: Create x86_64 DMG
+        run: |
+          VERSION=$(grep '^version' src-tauri/Cargo.toml | head -1 | cut -d'"' -f2)
+          hdiutil create \
+            -volname "Voz Local" \
+            -srcfolder "src-tauri/target/x86_64-apple-darwin/release/bundle/macos/Voz Local.app" \
+            -ov -format UDZO \
+            "dist/Voz Local_${VERSION}_x86_64.dmg"
+
+      # ── Publish release ─────────────────────────────────────────────────────
+
+      - name: Upload DMGs to Release
         uses: softprops/action-gh-release@v2
         with:
           name: "Voz Local ${{ github.ref_name }}"
@@ -76,64 +107,6 @@ jobs:
             > Si macOS dice que la app está dañada: `sudo xattr -cr /Applications/Voz\ Local.app`
 
             > Requiere macOS 11 (Big Sur) o superior · Apple Silicon e Intel
-          files: |
-            src-tauri/target/release/bundle/dmg/*.dmg
-          draft: false
-          prerelease: false
-
-  # ── Intel (x86_64) ──────────────────────────────────────────────────────────
-  build-x86_64:
-    needs: [build-arm64]  # ensures release is created before we append the x86_64 DMG
-    runs-on: macos-13   # Last GitHub-hosted Intel runner
-    permissions:
-      contents: write
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: npm
-
-      - name: Setup Rust
-        uses: dtolnay/rust-toolchain@stable
-
-      - name: Cache Rust dependencies
-        uses: Swatinem/rust-cache@v2
-        with:
-          workspaces: src-tauri
-
-      - name: Install Node dependencies
-        run: npm ci
-
-      - name: Build Tauri app bundle (x86_64)
-        run: npm run tauri build -- --bundles app
-        env:
-          TAURI_SIGNING_PRIVATE_KEY: ""
-          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ""
-
-      - name: Ad-hoc sign app bundle
-        run: |
-          codesign --deep --force --sign - \
-            --entitlements src-tauri/entitlements.plist \
-            "src-tauri/target/release/bundle/macos/Voz Local.app"
-
-      - name: Create DMG (x86_64)
-        run: |
-          VERSION=$(grep '^version' src-tauri/Cargo.toml | head -1 | cut -d'"' -f2)
-          mkdir -p "src-tauri/target/release/bundle/dmg"
-          hdiutil create \
-            -volname "Voz Local" \
-            -srcfolder "src-tauri/target/release/bundle/macos/Voz Local.app" \
-            -ov -format UDZO \
-            "src-tauri/target/release/bundle/dmg/Voz Local_${VERSION}_x86_64.dmg"
-
-      - name: Upload DMG to Release
-        uses: softprops/action-gh-release@v2
-        with:
-          files: |
-            src-tauri/target/release/bundle/dmg/*.dmg
+          files: dist/*.dmg
           draft: false
           prerelease: false
