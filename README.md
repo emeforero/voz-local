@@ -5,7 +5,7 @@
 Press a keyboard shortcut, speak, and the text appears wherever your cursor is — in any app.
 
 [![Release](https://img.shields.io/github/v/release/emeforero/voz-local?style=flat-square)](https://github.com/emeforero/voz-local/releases/latest)
-[![macOS](https://img.shields.io/badge/macOS-12%2B-black?style=flat-square&logo=apple)](https://github.com/emeforero/voz-local/releases/latest)
+[![macOS](https://img.shields.io/badge/macOS-14%2B-black?style=flat-square&logo=apple)](https://github.com/emeforero/voz-local/releases/latest)
 [![Apple Silicon](https://img.shields.io/badge/Apple_Silicon-M1%2FM2%2FM3%2FM4-black?style=flat-square)](https://github.com/emeforero/voz-local/releases/latest)
 [![License: MIT](https://img.shields.io/badge/License-MIT-black?style=flat-square)](LICENSE)
 
@@ -15,7 +15,7 @@ Press a keyboard shortcut, speak, and the text appears wherever your cursor is �
 
 **[⬇ Download Voz Local for macOS](https://github.com/emeforero/voz-local/releases/latest)**
 
-> Requires macOS 12 (Monterey) or later · Apple Silicon (M1/M2/M3/M4)
+> Requires macOS 14 (Sonoma) or later · Apple Silicon (M1/M2/M3/M4)
 
 ---
 

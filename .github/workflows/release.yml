@@ -69,7 +69,7 @@ jobs:
 
             > If macOS says the app is damaged: open Terminal and run `sudo xattr -cr /Applications/Voz\ Local.app`
 
-            > Requires macOS 12+ · Apple Silicon (M1/M2/M3/M4)
+            > Requires macOS 14 (Sonoma) or later · Apple Silicon (M1/M2/M3/M4)
           files: |
             src-tauri/target/release/bundle/dmg/*.dmg
           draft: false
