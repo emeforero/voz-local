@@ -1,8 +1,8 @@
 # Voz Local
 
-**Voz a texto 100% local en tu Mac. Sin nube, sin suscripción, sin internet.**
+**100% local speech-to-text for your Mac. No cloud, no subscription, no internet.**
 
-Presiona el atajo de teclado, habla, y el texto aparece donde está tu cursor — en cualquier app.
+Press a keyboard shortcut, speak, and the text appears wherever your cursor is — in any app.
 
 [![Release](https://img.shields.io/github/v/release/emeforero/voz-local?style=flat-square)](https://github.com/emeforero/voz-local/releases/latest)
 [![macOS](https://img.shields.io/badge/macOS-12%2B-black?style=flat-square&logo=apple)](https://github.com/emeforero/voz-local/releases/latest)
@@ -11,65 +11,65 @@ Presiona el atajo de teclado, habla, y el texto aparece donde está tu cursor �
 
 ---
 
-## Descarga
+## Download
 
-**[⬇ Descargar última versión para macOS](https://github.com/emeforero/voz-local/releases/latest)**
+**[⬇ Download Voz Local for macOS](https://github.com/emeforero/voz-local/releases/latest)**
 
-> Requiere macOS 12 (Monterey) o superior · Apple Silicon (M1/M2/M3/M4)
-
----
-
-## Qué hace
-
-- **Transcripción local** con [Whisper](https://github.com/openai/whisper) (ggml) acelerado por Metal — el modelo corre completamente en tu Mac, nada sale a internet
-- **Atajo global** configurable (por defecto `Alt+Space`) — funciona aunque la ventana esté cerrada
-- **Push to talk** o modo toggle
-- **Pegado automático** donde tengas el cursor
-- **Widget flotante** con visualización de audio en tiempo real
-- **Historial** de transcripciones con reproducción de audio
-- **Vocabulario personalizado** para mejorar el reconocimiento de términos técnicos
-- **Inicio automático** con el sistema
+> Requires macOS 12 (Monterey) or later · Apple Silicon (M1/M2/M3/M4)
 
 ---
 
-## Instalación
+## Features
 
-1. Descarga el `.dmg` desde [Releases](https://github.com/emeforero/voz-local/releases/latest)
-2. Abre el `.dmg` y arrastra **Voz Local** a Aplicaciones
-3. Abre la app — aparece en la barra de menú (no en el Dock)
-4. Concede los permisos de **Micrófono** y **Accesibilidad**
-5. Descarga el modelo Whisper desde la pantalla de bienvenida
-6. Presiona `Alt+Space` para dictar
-
-> **Si macOS dice "dañado":** abre Terminal y ejecuta `sudo xattr -cr /Applications/Voz\ Local.app`
+- **Local transcription** using [Whisper](https://github.com/openai/whisper) (ggml) accelerated by Metal — the model runs entirely on your Mac, nothing leaves your device
+- **Global shortcut** (default `Alt+Space`) — works even when the window is closed
+- **Push-to-talk** or toggle mode
+- **Auto-paste** wherever your cursor is
+- **Floating widget** with real-time audio visualization
+- **Transcription history** with audio playback
+- **Custom vocabulary** to improve recognition of technical terms
+- **Launch at login** support
 
 ---
 
-## Permisos requeridos
+## Installation
 
-| Permiso | Para qué |
+1. Download the `.dmg` from [Releases](https://github.com/emeforero/voz-local/releases/latest)
+2. Open the `.dmg` and drag **Voz Local** to Applications
+3. Open the app — it lives in the menu bar (not the Dock)
+4. Grant **Microphone** and **Accessibility** permissions when prompted
+5. Download a Whisper model from the welcome screen
+6. Press `Alt+Space` to start dictating
+
+> **If macOS says the app is damaged:** open Terminal and run `sudo xattr -cr /Applications/Voz\ Local.app`
+
+---
+
+## Permissions
+
+| Permission | Why |
 |---|---|
-| **Micrófono** | Capturar audio |
-| **Accesibilidad** | Pegar el texto automáticamente donde escribes |
+| **Microphone** | Capture audio input |
+| **Accessibility** | Auto-paste transcribed text at your cursor position |
 
-> Sin Accesibilidad el texto igual se copia al portapapeles — puedes pegarlo manualmente con `Cmd+V`.
+> Without Accessibility permission the text is still copied to the clipboard — you can paste it manually with `Cmd+V`.
 
 ---
 
-## Modelos disponibles
+## Models
 
-| Modelo | Tamaño | Velocidad | Precisión |
+| Model | Size | Speed | Accuracy |
 |---|---|---|---|
 | Whisper Large v3 Turbo | 809 MB | ★★★★☆ | ★★★★★ |
 | Whisper Base | 141 MB | ★★★★★ | ★★★☆☆ |
 
-Los modelos no se incluyen en el instalador. Al abrir la app por primera vez, elige y descarga el modelo directamente desde la pantalla de bienvenida. Se guardan en `~/Library/Application Support/com.vozlocal.app/models/` y funcionan sin conexión una vez descargados.
+Models are not bundled with the installer. On first launch, choose and download your preferred model directly from the welcome screen. Models are stored in `~/Library/Application Support/com.vozlocal.app/models/` and work offline once downloaded.
 
 ---
 
-## Construir desde código fuente
+## Building from source
 
-### Requisitos
+### Requirements
 
 - [Rust](https://rustup.rs) (stable)
 - [Node.js](https://nodejs.org) 18+
@@ -79,38 +79,38 @@ Los modelos no se incluyen en el instalador. Al abrir la app por primera vez, el
 git clone https://github.com/emeforero/voz-local
 cd voz-local
 npm install
-npm run tauri dev        # desarrollo
-npm run tauri build      # producción
+npm run tauri dev        # development
+npm run tauri build      # production
 ```
 
 ---
 
-## Stack técnico
+## Tech stack
 
-| Capa | Tecnología |
+| Layer | Technology |
 |---|---|
 | Frontend | SvelteKit + TypeScript (adapter-static) |
 | Backend | Rust + Tauri v2 |
-| Transcripción | [whisper-rs](https://github.com/tazz4843/whisper-rs) + Metal (GPU Apple Silicon) |
-| Audio | cpal |
-| Corrección de texto | [strsim](https://github.com/dguo/strsim-rs) (Jaro-Winkler) |
-| Widget | NSVisualEffectView (vibrancy nativa macOS) |
+| Transcription | [whisper-rs](https://github.com/tazz4843/whisper-rs) + Metal (Apple Silicon GPU) |
+| Audio capture | cpal |
+| Word correction | [strsim](https://github.com/dguo/strsim-rs) (Jaro-Winkler) |
+| Widget | NSVisualEffectView (native macOS vibrancy) |
 
 ---
 
 ## Changelog
 
 ### v1.5.0
-- **Transcripción más rápida**: detección de silencio por energía (VAD) antes de enviar audio a Whisper — reduce el audio procesado entre 20-70% en grabaciones típicas
-- **Vocabulario personalizado**: lista de palabras/frases que se pasan a Whisper como `initial_prompt` para mejorar el reconocimiento de términos técnicos (GitHub, Claude Code, Node.js, TypeScript, etc.)
-- **Corrección post-transcripción**: comparación fuzzy con Jaro-Winkler entre el texto transcripto y el vocabulario personalizado — corrige errores leves como "tyepscript" → "TypeScript"
-- **Umbral de corrección configurable**: slider en Ajustes para controlar qué tan agresiva es la corrección (0.85 por defecto)
+- **Faster transcription**: energy-based VAD trims leading/trailing silence before Whisper inference, reducing processed audio by 20–70% on typical recordings
+- **Custom vocabulary**: user-defined word list passed to Whisper as `initial_prompt` to bias recognition toward technical terms (GitHub, Claude Code, Node.js, TypeScript, etc.)
+- **Post-transcription word correction**: Jaro-Winkler fuzzy matching between the transcript and the custom vocabulary — corrects typos like "tyepscript" → "TypeScript"
+- **Configurable correction threshold**: slider in Settings to control how aggressively corrections are applied (default 0.85)
 
 ### v0.1.0
-- Release inicial: transcripción local con Whisper, atajo global, push-to-talk, widget flotante, historial, pegado automático
+- Initial release: local Whisper transcription, global shortcut, push-to-talk, floating widget, transcription history, auto-paste
 
 ---
 
-## Licencia
+## License
 
 MIT
